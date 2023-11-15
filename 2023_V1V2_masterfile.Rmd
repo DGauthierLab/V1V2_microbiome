@@ -1,0 +1,111 @@
+---
+title: "V1V2 Microbiome Paper Project"
+author: "Mikey Norris"
+date: "11/15/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r Library}
+# This is an artifact that can likely be removed.
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+```
+
+```{r General Notes}
+# This file covers the visual analyses of the 2022-380/381 microbiome work on A. maculatum ticks in Virginia. Work was done in collaboration with Dr. David Gauthier and Rebecca Ferrara at Old Dominion University.
+
+# Table of Contents:
+# -------------------
+# PCoA (Principle Coordinates of Analysis)
+# Shannon Diversity Boxplot
+# PLNModels (Not used)
+```
+
+```{r library + file input}
+# if (!requireNamespace("devtools", quietly = TRUE)){install.packages("devtools")}
+# devtools::install_github("jbisanz/qiime2R") # current version is 0.99.20
+# install.packages("htmltools")
+library(qiime2R)
+library(tidyverse)
+
+# The metadata file can be found in -> 
+metadata<-read_q2metadata("metadata_RIPBIO_V1V2_v2.txt")
+uwunifrac<-read_qza("unweighted_unifrac_pcoa_results_allassigned_norick_5000_10_nocontrol_valid.qza")
+shannon<-read_qza("shannon_vector_allassigned_norick_5000_10_nocontrol_valid.qza")$data %>% rownames_to_column("SampleID") 
+```
+
+```{r PCoA Analysis}
+# This PCoA uses 1 variable, but you can do upwards of 3 variables. 
+uwunifrac$data$Vectors %>%
+  select(SampleID, PC1, PC2) %>%
+  left_join(metadata) %>%
+  left_join(shannon) %>%
+  ggplot(aes(x=PC1, y=PC2, color=`sex`)) +
+  geom_point(alpha=0.5) + #alpha controls transparency and helps when points are overlapping
+  theme_q2r() +
+   #see
+# http://www.sthda.com/sthda/RDoc/figure/graphs/r-plot-pch-symbols-points-in-r.png for numeric shape codes
+  scale_color_discrete(name="Sex") + 
+  stat_ellipse()
+  ggsave("PCoA_Sex.pdf", height=4, width=5, device="pdf") # save a PDF 3 inches by 4 inches
+  
+```
+
+```{r Boxplot, echo=FALSE}
+# Dataset B (Rickettsia Included):
+metadata<-read_q2metadata("metadataB.tsv")
+shannon<-read_qza("dada2_20_19_235_235_p2/core-metrics-results_B_allassigned_decontam_with_Rick_5000_10_no_control_valid2/shannon_vector_B_allassigned_decontam_with_Rick_5000_10_no_control_valid2.qza")
+
+shannon<-shannon$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged
+
+New_Metadata <-cbind(metadata, shannon)
+
+New_Metadata$SampleID <- NULL 
+
+shannon_boxplot2 <- ggplot(New_Metadata, aes(x= rp, y=shannon_entropy, fill=rp)) + geom_boxplot() + labs(y = "Shannon Entropy", x = "Rp Status")
+
+shannon_boxplot2
+
+# Saving the boxplot
+ggsave("B_Boxplot.pdf", width = 5, height = 4)
+
+# Dataset C (Rickettsia Removed):
+metadata<-read_q2metadata("metadata_C.tsv")
+
+shannon_boxplot2 <- ggplot(metadata, aes(x= rp, y=shannon_entropy, fill=rp)) + geom_boxplot() + labs(y = "Shannon Entropy", x = "Rp Status")
+
+shannon_boxplot2
+
+# Saving the boxplot
+ggsave("C_Boxplot.pdf", width = 5, height = 4)
+```
+
+```{r PLNModel Circle, echo=FALSE}
+# NOTE: This is an artificat, and was not used in the final microbiome analysis, a seperate .rmd file contains the PLNmodels work (conducted by Dr. Gauthier).
+
+# install.packages("PLNmodels")
+library(PLNmodels)
+
+# prepare data to combine the read data to meta data to do column not column thing
+
+metadata <- read.csv("metadata.csv")
+abundance <- read.csv("reads_test.csv")
+
+combined <- list()
+combined[[1]] <- abundance
+combined[[2]] <- metadata
+combined <-Map(setNames, abundance , metadata)
+combined <- lapply(combined, setNames, abundance, metadata)
+
+maculatum <- prepare_data(abundance, metadata)
+
+```
+
+
