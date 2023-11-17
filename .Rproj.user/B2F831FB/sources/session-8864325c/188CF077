@@ -1,0 +1,28 @@
+{
+    "id": "188CF077",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1700230898365.0,
+    "source_on_save": false,
+    "relative_order": 11,
+    "properties": {
+        "id": "228d05d2e77846b2bce76b7bbc024134",
+        "name": "trichoptera",
+        "title": "trichoptera",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 0,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1700230898365,
+    "read_only": false,
+    "read_only_alternatives": []
+}

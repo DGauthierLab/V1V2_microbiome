@@ -1,0 +1,14 @@
+"0","pdf(""PCA_BIC.pdf"", width = 9, height = 4.5)
+gridExtra::grid.arrange(
+  plot(myPCA_BIC, map = ""individual"", ind_cols = C_microbiome$location, plot = FALSE),
+  plot(myPCA_BIC, map = ""variable"", plot = FALSE),
+  ncol = 2
+)
+dev.off()
+"
+"1","null device "
+"1","
+"
+"1","          1 "
+"1","
+"
