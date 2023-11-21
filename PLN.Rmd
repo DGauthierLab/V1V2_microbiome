@@ -35,9 +35,7 @@ View(D_data)
 #joined_data <- inner_join(abundance, metadata, by = "id")
 
 C_metadata_ordered <- C_data %>%
-  select(id,location,sex,rp) %>%
-  mutate(sex = case_when(sex == "male" ~ 4,
-                          sex == "female" ~3))
+  select(id,location,sex,rp)
 
 
 C_abundance_ordered_a <- C_data %>%
@@ -211,9 +209,41 @@ plot(PCA_models)
 myPCA_ICL <- getBestModel(PCA_models, "ICL") 
 myPCA_BIC <- getModel(PCA_models, 3) # getBestModel(PCA_models, "BIC")  is equivalent here 
 
-pdf("PCA_BIC.pdf", width = 9, height = 4.5)
+
+plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = TRUE, main = "", )
+
+
+
+
+
+pdf("PCA_BIC_individuals.pdf", width = 6, height = 6)
+gridExtra::grid.arrange(
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = FALSE, main = ""),
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$sex, plot = FALSE, main = "individual factor"),
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$rp, plot = FALSE, main = ""),
+  plot(myPCA_BIC, map = "variable", plot = FALSE),
+  ncol = 2
+)
+dev.off()
+
+pdf("PCA_BIC_variable.pdf", width = 4.5, height = 4.5)
+gridExtra::grid.arrange(
+  plot(myPCA_BIC, map = "variable", plot = FALSE),
+  ncol = 1
+)
+dev.off()
+
+pdf("PCA_BIC_location.pdf", width = 9, height = 4.5)
 gridExtra::grid.arrange(
   plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = FALSE),
+  plot(myPCA_BIC, map = "variable", plot = FALSE),
+  ncol = 2
+)
+dev.off()
+
+pdf("PCA_BIC_rp.pdf", width = 9, height = 4.5)
+gridExtra::grid.arrange(
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$rp, plot = FALSE),
   plot(myPCA_BIC, map = "variable", plot = FALSE),
   ncol = 2
 )
@@ -335,3 +365,4 @@ my_graph
 
 plot(model_StARS)
 ```
+plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = TRUE, main = "")
