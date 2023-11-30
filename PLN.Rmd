@@ -210,7 +210,8 @@ myPCA_ICL <- getBestModel(PCA_models, "ICL")
 myPCA_BIC <- getModel(PCA_models, 3) # getBestModel(PCA_models, "BIC")  is equivalent here 
 
 
-plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = TRUE, main = "", )
+plot <- plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = TRUE, main = "" ) 
+  theme_bw()
 
 
 
