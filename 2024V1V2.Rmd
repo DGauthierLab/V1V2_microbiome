@@ -1,0 +1,480 @@
+---
+title: "V1V2 Microbiome Paper Project"
+author: "Mikey Norris + Dr. Gauthier"
+date: "02/12/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r General Library}
+# These libraries are used throughout the code.
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+install.packages('abind')
+library(dplyr)
+library(scales)
+```
+
+```{r General Notes}
+# This file covers the visual analyses of the 2022-380/381 microbiome work on A. maculatum ticks in Virginia. Work was done in collaboration with Dr. David Gauthier and Rebecca Ferrara at Old Dominion University.
+
+# Table of Contents:
+# -------------------
+# PCoA (Principle Coordinates of Analysis)
+# Shannon Diversity Boxplot
+# Core Features
+# PLNModels 
+```
+
+```{r Library + file input (PCOA + Shannon Boxplot)}
+# if (!requireNamespace("devtools", quietly = TRUE)){install.packages("devtools")}
+# devtools::install_github("jbisanz/qiime2R") # current version is 0.99.20
+# install.packages("htmltools")
+library(qiime2R)
+library(tidyverse)
+
+# The metadata file can be found in -> 
+metadata<-read_q2metadata("metadata_RIPBIO_V1V2_v2.txt")
+uwunifrac<-read_qza("unweighted_unifrac_pcoa_results_allassigned_norick_5000_10_nocontrol_valid.qza")
+shannon<-read_qza("shannon_vector_allassigned_norick_5000_10_nocontrol_valid.qza")$data %>% rownames_to_column("SampleID") 
+```
+
+```{r PCoA Analysis}
+# This PCoA uses 1 variable, but you can do upwards of 3 variables. 
+uwunifrac$data$Vectors %>%
+  select(SampleID, PC1, PC2) %>%
+  left_join(metadata) %>%
+  left_join(shannon) %>%
+  ggplot(aes(x=PC1, y=PC2, color=`sex`)) +
+  geom_point(alpha=0.5) + #alpha controls transparency and helps when points are overlapping
+  theme_q2r() +
+   #see
+# http://www.sthda.com/sthda/RDoc/figure/graphs/r-plot-pch-symbols-points-in-r.png for numeric shape codes
+  scale_color_discrete(name="Sex") + 
+  stat_ellipse()
+  ggsave("PCoA_Sex.pdf", height=4, width=5, device="pdf") # save a PDF 3 inches by 4 inches
+  
+```
+
+```{r Shannon Boxplot, echo=FALSE}
+library(qiime2R)
+library(tidyverse)
+
+# Dataset B (Rickettsia Included):
+metadata<-read_q2metadata("metadata_RIPBIO_V1V2_v2.txt")
+shannon<-read_qza("shannon_vector_C_allassigned_decontam_no_Rick_1900_10_10_no_control_valid2.qza")
+
+shannon<-shannon$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged
+
+combined_test <- shannon %>% 
+    left_join(metadata) %>% 
+    replace_na(list(SampleID = 0))
+
+combined_test$SampleID <- NULL 
+
+shannon_boxplot2 <- ggplot(combined_test, aes(x= rp, y=shannon_entropy, fill=rp)) + geom_boxplot() + labs(y = "Shannon Entropy", x = "Rp Status")
+# syntax theme call to remove the background (black and white theme)
+
+shannon_boxplot2
+
+# Saving the boxplot
+ggsave("C_RpStatus_Boxplot.pdf", width = 4, height = 5)
+
+# Dataset C (Rickettsia Removed):
+metadata<-read_q2metadata("metadata_C.tsv")
+
+shannon_boxplot2 <- ggplot(metadata, aes(x= rp, y=shannon_entropy, fill=rp)) + geom_boxplot() + labs(y = "Shannon Entropy", x = "Rp Status")
+
+shannon_boxplot2
+
+# Saving the boxplot
+ggsave("C_Boxplot.pdf", width = 5, height = 4)
+
+
+#use grids to combine the boxplots
+```
+
+```{r Core Features}
+#Core features table was taken from the corefeatures results through the Qiime2 pipeline. The data was put into an excel csv file but the data was not manipulated. This was done so any underscores/italics issues were fixed and the proper ID's were found at each fraction. 
+corefeatures <- read.csv("corefeatures.csv")
+
+ ggplot(corefeatures, aes(x = Fraction.of.Samples, y = Feature.Count)) + geom_point() + geom_line() +
+  theme_bw() + scale_y_continuous(breaks=c(0,1,2)) +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) + 
+   xlab("Fraction of Samples") + ylab("Feature Count")
+ 
+ ggsave("corefeatures.pdf", width = 5, height = 4)
+```
+
+```{r PLN models Library}
+library(readr)
+library(PLNmodels)
+library(ggplot2)
+library(tidyverse)
+library(googlesheets4)
+```
+
+
+```{r Am network data prep}
+
+B_data <- read_csv("barplot_exports/level6_B.csv") %>%
+  rename(id = index)
+View(B_data)
+
+C_data <- read_csv("barplot_exports/level6_C.csv") %>%
+  rename(id = index)
+View(C_data)
+
+D_data <- read_csv("barplot_exports/level6_D.csv") %>%
+  rename(id = index)
+View(D_data)
+
+#abundance<-read_sheet("https://docs.google.com/spreadsheets/d/120PG7RZufx3aKSijSOKWAMKIstlERbL9ryG98aCj4RM/edit?usp=sharing", sheet = "sum_prev_top50_tp", col_names = TRUE) %>%
+ # rename(id = index)
+#metadata <- read_csv("metadata_test.csv")
+#joined_data <- inner_join(abundance, metadata, by = "id")
+
+C_metadata_ordered <- C_data %>%
+  select(id,location,sex,rp)
+
+
+C_abundance_ordered_a <- C_data %>%
+  select(-id) %>%
+  select(!`barcode-sequence`:indexing) %>%
+  select(ends_with(';__')) %>%
+  rename_with(~sub('.*;.__(.*);__','\\1', .))
+
+C_abundance_ordered_b <- C_data %>%
+  select(-id) %>%
+  select(!`barcode-sequence`:indexing) %>%
+  select(matches('[a-z]$')) %>%
+  rename_with(~sub('.*__(.*$)','\\1', .))
+
+C_abundance_ordered <- cbind(C_abundance_ordered_a,C_abundance_ordered_b) 
+```
+
+```{r Am network analysis}
+#Check to make sure this doesn't include id in abundance matrix.
+C_microbiome <- prepare_data(C_abundance_ordered, C_metadata_ordered, offset = "GMPR")
+
+str(C_microbiome)
+View(C_microbiome)
+
+plot.new()
+corrplot::corrplot(
+  t(log(1 + C_abundance_ordered)),
+  is.corr = FALSE,
+  addgrid.col = NA, 
+  tl.cex = 0.5, 
+)
+
+myPLN <- PLN(Abundance ~ 1, C_microbiome)
+myPLN
+c(myPLN$loglik, myPLN$BIC, myPLN$ICL)
+
+data.frame(
+  fitted   = as.vector(fitted(myPLN)),
+  observed = as.vector(C_microbiome$Abundance)
+) %>% 
+  ggplot(aes(x = observed, y = fitted)) + 
+    geom_point(size = .5, alpha =.25 ) + 
+    scale_x_log10() + 
+    scale_y_log10() + 
+    theme_bw() + annotation_logticks()
+
+myPLN %>% sigma() %>% cov2cor() %>% corrplot::corrplot()
+
+myPLN_weighted <-
+  PLN(
+    Abundance ~ 1,
+    data    = C_microbiome,
+    weights = runif(nrow(C_microbiome)),
+    control = PLN_param(trace = 0)
+  )
+data.frame(
+  unweighted = as.vector(fitted(myPLN)),
+  weighted   = as.vector(fitted(myPLN_weighted))
+) %>%
+  ggplot(aes(x = unweighted, y = weighted)) +
+    geom_point(size = .5, alpha =.25 ) +
+    scale_x_log10() +
+    scale_y_log10() +
+    theme_bw() + annotation_logticks()
+
+myPLN_offsets <- 
+  PLN(Abundance ~ 1 + offset(log(Offset)), 
+      data = C_microbiome, control = PLN_param(trace = 0))
+
+rbind(
+  myPLN$criteria,
+  myPLN_offsets$criteria
+) %>% knitr::kable()
+
+myPLN_diagonal <-
+  PLN(
+    Abundance ~ 1 + offset(log(Offset)),
+    data = C_microbiome, control = PLN_param(covariance = "diagonal", trace = 0)
+  )
+
+myPLN_spherical <-
+  PLN(
+    Abundance ~ 1 + offset(log(Offset)),
+    data = C_microbiome, control = PLN_param(covariance = "spherical", trace = 0)
+  )
+
+myPLN_default <-
+  PLN(
+    Abundance ~ 1 + offset(log(Offset)),
+    data = C_microbiome,
+  )
+
+myPLN_full <-
+  PLN(
+    Abundance ~ 1 + offset(log(Offset)),
+    data = C_microbiome, control = PLN_param(covariance = "full", trace = 0)
+  )
+
+rbind(
+  myPLN_offsets$criteria,
+  myPLN_diagonal$criteria,
+  myPLN_spherical$criteria,
+  myPLN_default$criteria,
+  myPLN_full$criteria
+) %>%
+  as.data.frame(row.names = c("offsets","diagonal", "spherical", "full", "default")) %>%
+  knitr::kable()
+
+myPLN_loc_sph <- PLN(Abundance ~ 1 + location + offset(log(Offset)), data = C_microbiome, control = PLN_param(covariance = "spherical", trace = 0))
+myPLN_sex_sph <- PLN(Abundance ~ 1 + sex + offset(log(Offset)), data = C_microbiome, control = PLN_param(covariance = "spherical", trace = 0))
+myPLN_rp_sph <- PLN(Abundance ~ 1 + rp + offset(log(Offset)), data = C_microbiome, control = PLN_param(covariance = "spherical", trace = 0))
+myPLN_loc_sex_sph <- PLN(Abundance ~ 1 + sex + location + offset(log(Offset)), data = C_microbiome, control = PLN_param(covariance = "spherical", trace = 0))
+myPLN_loc_rp_sph <- PLN(Abundance ~ 1 + location + rp + offset(log(Offset)), data = C_microbiome, control = PLN_param(covariance = "spherical", trace = 0))
+myPLN_sex_rp_sph <- PLN(Abundance ~ 1 + sex + rp + offset(log(Offset)), data = C_microbiome, control = PLN_param(covariance = "spherical", trace = 0))
+myPLN_loc_sex_rp_sph <- PLN(Abundance ~ 1 + rp + sex + location + offset(log(Offset)), data = C_microbiome, control = PLN_param(covariance = "spherical", trace = 0))
+
+rbind(
+  myPLN_offsets$criteria,
+  myPLN_diagonal$criteria,
+  myPLN_spherical$criteria,
+  myPLN_default$criteria,
+  myPLN_full$criteria,
+  myPLN_loc_sph$criteria,
+  myPLN_sex_sph$criteria,
+  myPLN_rp_sph$criteria,
+  myPLN_loc_sex_sph$criteria,
+  myPLN_loc_rp_sph$criteria,
+  myPLN_sex_rp_sph$criteria,
+  myPLN_loc_sex_rp_sph$criteria 
+) %>%
+  as.data.frame(row.names = c("offsets","diagonal", "spherical", "default", "full", "loc_sph", "sex_sph", "rp_sph", "loc_sex_sph", "loc_rp_sph", "sex_rp_sph", "loc_sex_rp_sph")) %>%
+  knitr::kable()
+```
+```{r PLN-LDA}
+myLDA_nocov <- PLNLDA(Abundance ~ 0 + offset(log(Offset)),
+                      grouping = rp, 
+                      data = C_microbiome)
+
+myLDA_nocov
+sigma(myLDA_nocov) %>% corrplot::corrplot(is.corr = FALSE)
+coef(myLDA_nocov)
+myLDA_nocov$group_means %>% head() %>% knitr::kable(digits = 2)
+
+
+myLDA_loc <- PLNLDA(Abundance ~ location + 0 + offset(log(Offset)),
+                   grouping = rp,
+                   data = C_microbiome)
+
+myLDA_loc
+sigma(myLDA_loc) %>% corrplot::corrplot(is.corr = FALSE)
+coef(myLDA_loc)
+myLDA_nocov$group_means %>% head() %>% knitr::kable(digits = 2)
+
+
+
+
+plot(myLDA_nocov)
+```
+```{r PCA}
+PCA_models <- PLNPCA(
+  Abundance ~ 1 + offset(log(Offset)),
+  data  = C_microbiome, 
+  ranks = 1:30
+)
+
+PCA_models$criteria %>% knitr::kable()
+PCA_models$convergence  %>% knitr::kable()
+
+plot(PCA_models)
+
+
+myPCA_ICL <- getBestModel(PCA_models, "ICL") 
+myPCA_BIC <- getModel(PCA_models, 3) # getBestModel(PCA_models, "BIC")  is equivalent here 
+
+
+plot <- plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = TRUE, main = "" ) 
+  theme_bw()
+
+
+
+
+
+pdf("PCA_BIC_individuals.pdf", width = 6, height = 6)
+gridExtra::grid.arrange(
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = FALSE, main = ""),
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$sex, plot = FALSE, main = "individual factor"),
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$rp, plot = FALSE, main = ""),
+  plot(myPCA_BIC, map = "variable", plot = FALSE),
+  ncol = 2
+)
+dev.off()
+
+pdf("PCA_BIC_variable.pdf", width = 4.5, height = 4.5)
+gridExtra::grid.arrange(
+  plot(myPCA_BIC, map = "variable", plot = FALSE),
+  ncol = 1
+)
+dev.off()
+
+pdf("PCA_BIC_location.pdf", width = 9, height = 4.5)
+gridExtra::grid.arrange(
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = FALSE),
+  plot(myPCA_BIC, map = "variable", plot = FALSE),
+  ncol = 2
+)
+dev.off()
+
+pdf("PCA_BIC_rp.pdf", width = 9, height = 4.5)
+gridExtra::grid.arrange(
+  plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$rp, plot = FALSE),
+  plot(myPCA_BIC, map = "variable", plot = FALSE),
+  ncol = 2
+)
+dev.off()
+
+
+plot(myPCA_BIC, ind_cols = C_microbiome$rp)
+
+
+```
+
+```{r network models}
+
+network_models <- PLNnetwork(Abundance ~ 1 + offset(log(Offset)),
+                             data = C_microbiome
+)
+
+network_models
+
+network_models$criteria %>% head() %>% knitr::kable()
+
+network_models$convergence %>% head() %>% knitr::kable()
+
+plot(network_models, "diagnostic")
+
+plot(network_models)
+
+coefficient_path(network_models, corr = TRUE) %>% 
+  ggplot(aes(x = Penalty, y = Coeff, group = Edge, colour = Edge)) + 
+  geom_line(show.legend = FALSE) +  coord_trans(x="log10") + theme_bw()
+
+model_pen <- getModel(network_models, network_models$penalties[20]) # give some sparsity
+model_BIC <- getBestModel(network_models, "BIC")   # if no criteria is specified, the best BIC is used
+model_BIC
+
+library(future)
+plan(multisession, workers = 2)
+
+n <- nrow(C_microbiome)
+subs <- replicate(10, sample.int(n, size = n/2), simplify = FALSE)
+stability_selection(network_models, subsamples = subs)
+
+model_StARS <- getBestModel(network_models, "StARS")
+
+plot(network_models, "stability")
+
+future::plan("sequential")
+
+model_StARS
+
+my_graph <- plot(model_StARS, plot = FALSE)
+my_graph
+
+plot(model_StARS)
+plot(model_StARS, type = "support", output = "corrplot")
+
+data.frame(
+  fitted   = as.vector(fitted(model_StARS)),
+  observed = as.vector(C_microbiome$Abundance)
+) %>% 
+  ggplot(aes(x = observed, y = fitted)) + 
+    geom_point(size = .5, alpha =.25 ) + 
+    scale_x_log10(limits = c(1,1000)) + 
+    scale_y_log10(limits = c(1,1000)) + 
+    theme_bw() + annotation_logticks()
+```
+
+```{r trichoptera vignette (tutorial)}
+
+data("trichoptera")
+
+trichoptera <- prepare_data(trichoptera$Abundance, trichoptera$Covariate)
+
+str(trichoptera)
+View(trichoptera)
+
+corrplot::corrplot(
+  t(log(1 + trichoptera$Abundance)),
+  is.corr = FALSE,
+  addgrid.col = NA
+)
+
+network_models <- PLNnetwork(Abundance ~ 1 + offset(log(Offset)), data = trichoptera)
+
+network_models
+
+network_models$criteria %>% head() %>% knitr::kable()
+
+network_models$convergence %>% head() %>% knitr::kable()
+
+plot(network_models, "diagnostic")
+
+plot(network_models)
+
+coefficient_path(network_models, corr = TRUE) %>% 
+  ggplot(aes(x = Penalty, y = Coeff, group = Edge, colour = Edge)) + 
+  geom_line(show.legend = FALSE) +  coord_trans(x="log10") + theme_bw()
+
+model_pen <- getModel(network_models, network_models$penalties[20]) # give some sparsity
+model_BIC <- getBestModel(network_models, "BIC")   # if no criteria is specified, the best BIC is used
+
+library(future)
+plan(multisession, workers = 2)
+
+n <- nrow(trichoptera)
+subs <- replicate(10, sample.int(n, size = n/2), simplify = FALSE)
+stability_selection(network_models, subsamples = subs)
+
+model_StARS <- getBestModel(network_models, "StARS")
+
+plot(network_models, "stability")
+
+future::plan("sequential")
+
+model_StARS
+
+my_graph <- plot(model_StARS, plot = FALSE)
+my_graph
+
+plot(model_StARS)
+plot(myPCA_BIC, map = "individual", ind_cols = C_microbiome$location, plot = TRUE, main = "")
+```
+
